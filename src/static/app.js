@@ -409,6 +409,143 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  // Handle share button click
+  async function handleShare(event) {
+    const button = event.currentTarget;
+    const activityName = button.dataset.activity;
+    const description = button.dataset.description;
+    const schedule = button.dataset.schedule;
+
+    // Create the share text
+    const shareText = `Check out this activity at Mergington High School!\n\n${activityName}\n${description}\nSchedule: ${schedule}`;
+    const shareUrl = window.location.href;
+
+    // Try to use native Web Share API (works on mobile and some modern browsers)
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `${activityName} - Mergington High School`,
+          text: shareText,
+          url: shareUrl,
+        });
+        showMessage("Activity shared successfully!", "success");
+        return;
+      } catch (error) {
+        // User cancelled or share failed
+        if (error.name !== "AbortError") {
+          console.error("Error sharing:", error);
+        }
+      }
+    }
+
+    // Fallback: show a modal with sharing options
+    showShareModal(activityName, shareText, shareUrl);
+  }
+
+  // Show share modal with various options
+  function showShareModal(activityName, shareText, shareUrl) {
+    // Create the share modal if it doesn't exist
+    let shareModal = document.getElementById("share-modal");
+    if (!shareModal) {
+      shareModal = document.createElement("div");
+      shareModal.id = "share-modal";
+      shareModal.className = "modal hidden";
+      shareModal.innerHTML = `
+        <div class="modal-content share-modal-content">
+          <span class="close-share-modal">&times;</span>
+          <h3>Share Activity</h3>
+          <div class="share-options">
+            <button class="share-option-button" id="share-email">
+              📧 Email
+            </button>
+            <button class="share-option-button" id="share-twitter">
+              🐦 Twitter
+            </button>
+            <button class="share-option-button" id="share-facebook">
+              📘 Facebook
+            </button>
+            <button class="share-option-button" id="share-copy">
+              📋 Copy Link
+            </button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(shareModal);
+
+      // Add close handler
+      const closeButton = shareModal.querySelector(".close-share-modal");
+      closeButton.addEventListener("click", () => {
+        shareModal.classList.remove("show");
+        setTimeout(() => {
+          shareModal.classList.add("hidden");
+        }, 300);
+      });
+
+      // Close when clicking outside
+      shareModal.addEventListener("click", (event) => {
+        if (event.target === shareModal) {
+          shareModal.classList.remove("show");
+          setTimeout(() => {
+            shareModal.classList.add("hidden");
+          }, 300);
+        }
+      });
+    }
+
+    // Show the modal
+    shareModal.classList.remove("hidden");
+    setTimeout(() => {
+      shareModal.classList.add("show");
+    }, 10);
+
+    // Set up share option handlers
+    const emailButton = document.getElementById("share-email");
+    const twitterButton = document.getElementById("share-twitter");
+    const facebookButton = document.getElementById("share-facebook");
+    const copyButton = document.getElementById("share-copy");
+
+    // Email sharing
+    emailButton.onclick = () => {
+      const subject = encodeURIComponent(`${activityName} - Mergington High School`);
+      const body = encodeURIComponent(shareText);
+      window.open(`mailto:?subject=${subject}&body=${body}`, "_blank");
+      closeShareModalHandler(shareModal);
+    };
+
+    // Twitter sharing
+    twitterButton.onclick = () => {
+      const text = encodeURIComponent(shareText);
+      window.open(`https://twitter.com/intent/tweet?text=${text}&url=${encodeURIComponent(shareUrl)}`, "_blank");
+      closeShareModalHandler(shareModal);
+    };
+
+    // Facebook sharing
+    facebookButton.onclick = () => {
+      window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`, "_blank");
+      closeShareModalHandler(shareModal);
+    };
+
+    // Copy link
+    copyButton.onclick = async () => {
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        showMessage("Link copied to clipboard!", "success");
+        closeShareModalHandler(shareModal);
+      } catch (error) {
+        console.error("Error copying to clipboard:", error);
+        showMessage("Failed to copy link", "error");
+      }
+    };
+  }
+
+  // Close share modal helper
+  function closeShareModalHandler(modal) {
+    modal.classList.remove("show");
+    setTimeout(() => {
+      modal.classList.add("hidden");
+    }, 300);
+  }
+
   // Function to display filtered activities
   function displayFilteredActivities() {
     // Clear the activities list
@@ -552,6 +689,11 @@ document.addEventListener("DOMContentLoaded", () => {
             .join("")}
         </ul>
       </div>
+      <div class="share-buttons">
+        <button class="share-button" data-activity="${name}" data-description="${details.description.replace(/"/g, '&quot;')}" data-schedule="${formattedSchedule.replace(/"/g, '&quot;')}" title="Share this activity">
+          📤 Share
+        </button>
+      </div>
       <div class="activity-card-actions">
         ${
           currentUser
@@ -576,6 +718,12 @@ document.addEventListener("DOMContentLoaded", () => {
     deleteButtons.forEach((button) => {
       button.addEventListener("click", handleUnregister);
     });
+
+    // Add click handler for share button
+    const shareButton = activityCard.querySelector(".share-button");
+    if (shareButton) {
+      shareButton.addEventListener("click", handleShare);
+    }
 
     // Add click handler for register button (only when authenticated)
     if (currentUser) {
